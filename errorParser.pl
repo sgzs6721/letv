@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 use strict;
 use Getopt::Long; 
+use Data::Dumper;
 #use Smart::Comments;
 use vars qw($logName $configFileName $insertDB $mail $jira);
 
@@ -12,6 +13,7 @@ GetOptions(
 ); 
 
 my @logList = getLog();
+if(!$configFileName) {$configFileName = "config.cfg";}
 foreach my $eachLog (@logList){
     my %hashInfo = parseLog($eachLog);
     my %configHash = parseConfigFile($configFileName);
@@ -24,13 +26,32 @@ sub getLog(){
     if($logName){ 
         return ($logName);
     }
-    my @fileList = glob "*\.cfg";
+    my @fileList = glob "log*\.txt";
     return @fileList;
 }
 
 sub parseLog(){
     my ($logName) = @_;
-    
+    my %errorFileList;
+    print $logName;
+    open LOG, $logName or die "Could not read the log $logName!";
+    my ($errorFile, $errorMsg);
+    while(<LOG>){
+        my $errorMsg;
+        if(/^(\S+\.(java|xml))\s*:\s*((\d+)*)\s*:\s*error\s*:\s*(.*)/is){
+            if(!exists($errorFileList{$1})){
+                $errorFileList{$1}->{line}  = $3;
+                $errorFileList{$1}->{msg}   = ($5);
+                $errorFileList{$1}->{owner} = findOwner($1);
+            }
+        }
+    }
+    close LOG;
+    print Dumper \%errorFileList;
+}
+
+sub findOwner(){
+    my ($errorFile) = @_;
 }
 
 sub insertDatabase(){
