@@ -14,9 +14,9 @@ GetOptions(
 
 my @logList = getLog();
 if(!$configFileName) {$configFileName = "config.cfg";}
+my %configHash = parseConfigFile($configFileName);
 foreach my $eachLog (@logList){
     my %hashInfo = parseLog($eachLog);
-    my %configHash = parseConfigFile($configFileName);
     if($insertDB){insertDatabase(\%hashInfo);}
     if($jira){sendIssue(\%hashInfo);}
     if($mail){sendEmail(\%hashInfo);}
@@ -33,7 +33,6 @@ sub getLog(){
 sub parseLog(){
     my ($logName) = @_;
     my %errorFileList;
-    print $logName;
     open LOG, $logName or die "Could not read the log $logName!";
     my ($errorFile, $errorMsg);
     while(<LOG>){
@@ -41,17 +40,48 @@ sub parseLog(){
         if(/^(\S+\.(java|xml))\s*:\s*((\d+)*)\s*:\s*error\s*:\s*(.*)/is){
             if(!exists($errorFileList{$1})){
                 $errorFileList{$1}->{line}  = $3;
-                $errorFileList{$1}->{msg}   = ($5);
-                $errorFileList{$1}->{owner} = findOwner($1);
+                $errorFileList{$1}->{msg}   = $5;
+                $errorFileList{$1}->{commit} = findOwner($1);
             }
         }
     }
-    close LOG;
     print Dumper \%errorFileList;
+    close LOG;
+    return %errorFileList;
 }
 
 sub findOwner(){
     my ($errorFile) = @_;
+    #my $filePath = $configHash->{codebase}->{path};
+    my $filePath = "/data/zhongshan/test/".$errorFile;
+    my $ownerInfo;
+    if(-f $filePath){
+        print "$filePath\n";
+        return getFileInfo($filePath);
+    }
+    else{
+        return {};
+    }
+}
+
+sub getFileInfo(){
+    my ($file) = @_;
+    my $commitInfo;
+    if($file =~ /(.*)\/(.*)/is){
+        chdir($1);
+        my $fileHistory = `git log -1 $2`;
+        if($fileHistory =~ /commit\s+(\S+).*?Author:\s*(\S+)\s+<(\S+)>.*?Date:\s*(.*?\+\d+).*?Ticket:\s*(\S+).*?Change-Id:\s*(\S+).*?Signed-off-by:\s*(\S+).*?<(\S+)>/is){
+            $commitInfo->{commitId} = $1;
+            $commitInfo->{author} = $2;
+            $commitInfo->{authorEmail} = $3;
+            $commitInfo->{date} = $4;
+            $commitInfo->{ticket} = $5;
+            $commitInfo->{changeId} = $6;
+            $commitInfo->{signOff} = $7;
+            $commitInfo->{signOffEmail} = $8;
+        }
+    }
+    return $commitInfo;
 }
 
 sub insertDatabase(){
@@ -86,7 +116,7 @@ sub parseConfigFile(){
                 $key =~ s/\s*$//;
                 $value =~ s/^\s*//;
                 $value =~ s/\s*$//;
-                print "($key, $value)", "\n";
+                #print "($key, $value)", "\n";
             }
         }
     }
