@@ -15,19 +15,34 @@ GetOptions(
 my @logList = getLog();
 if(!$configFileName) {$configFileName = "config.cfg";}
 my %configHash = parseConfigFile($configFileName);
+my $currentDir = `pwd`;
+$currentDir =~ s/\s//g;
+print $currentDir;
 foreach my $eachLog (@logList){
     my %hashInfo = parseLog($eachLog);
+    writeCSVFile(\%hashInfo, "$currentDir/errorFile.csv");
     if($insertDB){insertDatabase(\%hashInfo);}
     if($jira){sendIssue(\%hashInfo);}
-    if($mail){sendEmail(\%hashInfo);}
+    chdir($currentDir);
+    if($mail){sendEmail("$currentDir/errorFile.csv");}
 }
 
 sub getLog(){
-    if($logName){ 
+    if(-f $logName){ 
         return ($logName);
+    }elsif(-d $logName){
+        my @fileList = <$logName/log*.txt>;
+        return @fileList;
     }
-    my @fileList = glob "log*\.txt";
-    return @fileList;
+}
+
+sub writeCSVFile(){
+    my ($hashRef, $fileName) = @_;
+    open CSVFILE, ">$fileName" or die "Could not open the file $fileName!";
+    while(my ($file, $fileInfo) = each(%$hashRef)){
+        print CSVFILE "$file, $fileInfo->{no}, $fileInfo->{line}, $fileInfo->{commit}->{author},$fileInfo->{commit}->{authorEmail}, $fileInfo->{commit}->{date}, $fileInfo->{commit}->{commitId}, $fileInfo->{commit}->{ticket},$fileInfo->{commit}->{changeId}, $fileInfo->{commit}->{signOff}, $fileInfo->{commit}->{signOffEmail}, $fileInfo->{msg}\n";
+    }
+    close CSVFILE;
 }
 
 sub parseLog(){
@@ -39,8 +54,9 @@ sub parseLog(){
         my $errorMsg;
         if(/^(\S+\.(java|xml))\s*:\s*((\d+)*)\s*:\s*error\s*:\s*(.*)/is){
             if(!exists($errorFileList{$1})){
-                $errorFileList{$1}->{line}  = $3;
-                $errorFileList{$1}->{msg}   = $5;
+                $errorFileList{$1}->{no}     = $.;
+                $errorFileList{$1}->{line}   = $3;
+                $errorFileList{$1}->{msg}    = $5;
                 $errorFileList{$1}->{commit} = findOwner($1);
             }
         }
@@ -56,7 +72,6 @@ sub findOwner(){
     my $filePath = "/data/zhongshan/test/".$errorFile;
     my $ownerInfo;
     if(-f $filePath){
-        print "$filePath\n";
         return getFileInfo($filePath);
     }
     else{
@@ -91,6 +106,29 @@ sub insertDatabase(){
 
 sub sendEmail(){
     my ($info) = @_;
+    my $buildInfo = genMailInfo(getBuildInfo());
+    
+    my ($toList, $content);
+    while(my ($file, $fileInfo) = each(%$info)){
+        $content .= '\<table\>\<tr\>\<td\>Error:'.$file.'\</td\>\</tr\>';
+        $content .= '\<tr\>\<td\>Line:'.$fileInfo->{line}.'\</td\>\</tr\>';
+        $content .= '\<tr\>\<td\>Msg:'.$fileInfo->{msg}.'\</td\>\</tr\>';
+        $content .= '\<tr\>\<td\>Owner:'.$fileInfo->{commit}->{author}.'\</td\>\</tr\>';
+        $content .= '\<tr\>\<td\>Time:'.$fileInfo->{commit}->{date}.'\</td\>\</tr\>';
+        $content .= '\<tr\>\<td\>Email:'.$fileInfo->{commit}->{authorEmail}.'\</td\>\</tr\>';
+        $content .= '\</table\>\<br\>';
+        $toList .= $fileInfo->{commit}->{authorEmail}.",";
+    }
+    $content =~ s/\s/\\\&nbsp/ig;
+    system("python mailSender.py $toList $content");
+}
+
+sub genMailInfo(){
+    my ($buildInfo) = @_;
+    
+}
+
+sub getBuildInfo(){
     
 }
 
