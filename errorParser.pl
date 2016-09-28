@@ -39,8 +39,9 @@ sub getLog(){
 sub writeCSVFile(){
     my ($hashRef, $fileName) = @_;
     open CSVFILE, ">$fileName" or die "Could not open the file $fileName!";
+    print CSVFILE "ERROR FILLE,LOG NO.,LINE,OWNER,OWNER EMAIL,COMMIT DATE,COMMIT ID,TICKET,CHANGEID,SIGNOFF,SIGNOFF EMAIL,ERROR MSG\n";
     while(my ($file, $fileInfo) = each(%$hashRef)){
-        print CSVFILE "$file, $fileInfo->{no}, $fileInfo->{line}, $fileInfo->{commit}->{author},$fileInfo->{commit}->{authorEmail}, $fileInfo->{commit}->{date}, $fileInfo->{commit}->{commitId}, $fileInfo->{commit}->{ticket},$fileInfo->{commit}->{changeId}, $fileInfo->{commit}->{signOff}, $fileInfo->{commit}->{signOffEmail}, $fileInfo->{msg}\n";
+        print CSVFILE "$file, $fileInfo->{no}, $fileInfo->{line}, $fileInfo->{commit}->{author}, $fileInfo->{commit}->{authorEmail}, $fileInfo->{commit}->{date}, $fileInfo->{commit}->{commitId}, $fileInfo->{commit}->{ticket}, $fileInfo->{commit}->{changeId}, $fileInfo->{commit}->{signOff}, $fileInfo->{commit}->{signOffEmail}, $fileInfo->{msg}\n";
     }
     close CSVFILE;
 }
@@ -56,7 +57,10 @@ sub parseLog(){
             if(!exists($errorFileList{$1})){
                 $errorFileList{$1}->{no}     = $.;
                 $errorFileList{$1}->{line}   = $3;
-                $errorFileList{$1}->{msg}    = $5;
+                my $errorMessage             = $5;
+                chomp $errorMessage;
+                $errorFileList{$1}->{msg}    = $errorMessage;
+            
                 $errorFileList{$1}->{commit} = findOwner($1);
             }
         }
@@ -106,11 +110,9 @@ sub insertDatabase(){
 
 sub sendEmail(){
     my ($info) = @_;
-    my $buildInfo = genMailInfo(getBuildInfo());
-    
-    my ($toList, $content);
-    while(my ($file, $fileInfo) = each(%$info)){
-        $content .= '\<table\>\<tr\>\<td\>Error:'.$file.'\</td\>\</tr\>';
+    system("python mailSender.py $info 2>&1");
+=head
+        my $content = '\<table\>\<tr\>\<td\>Error:'.$file.'\</td\>\</tr\>';
         $content .= '\<tr\>\<td\>Line:'.$fileInfo->{line}.'\</td\>\</tr\>';
         $content .= '\<tr\>\<td\>Msg:'.$fileInfo->{msg}.'\</td\>\</tr\>';
         $content .= '\<tr\>\<td\>Owner:'.$fileInfo->{commit}->{author}.'\</td\>\</tr\>';
@@ -118,9 +120,7 @@ sub sendEmail(){
         $content .= '\<tr\>\<td\>Email:'.$fileInfo->{commit}->{authorEmail}.'\</td\>\</tr\>';
         $content .= '\</table\>\<br\>';
         $toList .= $fileInfo->{commit}->{authorEmail}.",";
-    }
-    $content =~ s/\s/\\\&nbsp/ig;
-    system("python mailSender.py $toList $content");
+=cut
 }
 
 sub genMailInfo(){
