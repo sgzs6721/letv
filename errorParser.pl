@@ -73,7 +73,7 @@ sub parseLog(){
 sub findOwner(){
     my ($errorFile) = @_;
     #my $filePath = $configHash->{codebase}->{path};
-    my $filePath = "/data/zhongshan/test/".$errorFile;
+    my $filePath = "/home/letv/jenkins_slave/workspace/C1-MP-SHIPPING-20160803-INDIA-DB/Android/".$errorFile;
     my $ownerInfo;
     if(-f $filePath){
         return getFileInfo($filePath);

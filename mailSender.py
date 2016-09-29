@@ -29,12 +29,11 @@ def sendMail(mailConf, mailInfo) :
     mailHeader = config.get("Email", "mailHeader")
     mailFooter = config.get("Email", "mailFooter")
 
-    header = "<h3>Hi all<font color='#FF0000'></font>,</h3><br/>"
     receiver = 'zhongshan@le.com'
-    subject = '[Timely Build]  Build Error on branch'
+    subject = '[Build Error] Please help to check the build error as following'
 
-    content = getMailContent()
-    msg = MIMEText(content,'html',_charset='utf-8')
+    content = getMailContent(mailInfo)
+    msg = MIMEText(mailHeader + content[0] + mailFooter,'html',_charset='utf-8')
     msg['From'] = senderShow
     msg['To']   = 'zhongshan@le.com'
     msg['Subject'] = Header(subject, 'utf-8')
@@ -42,9 +41,20 @@ def sendMail(mailConf, mailInfo) :
     smtp.sendmail(sender, receiver, msg.as_string())
     smtp.quit()
 
-def getMailContent():
-    print "1"
+def getMailContent(errorInfo):
+    content = ""
+    mailList = []
+    for error in errorInfo :
+        content = content + "<table border='1' cellspacing='0px'><tr><td bgcolor='#00FF00'>File</td><td>" + error[0] + "</td></tr>"
+        content = content + "<tr><td bgcolor='#00FF00'>LogNo.</td><td>" + error[1] + "</td></tr>"
+        content = content + "<tr><td bgcolor='#00FF00'>Line</td><td>" + error[2] + "</td></tr>"
+        content = content + "<tr><td bgcolor='#00FF00'>Owner</td><td><font color='#FF0000'><strong>" + error[3] + "</strong></font></td></tr>"
+        content = content + "<tr><td bgcolor='#00FF00'>Time</td><td>" + error[5] + "</td></tr>"
+        content = content + "<tr><td bgcolor='#00FF00'>Msg</td><td>" + error[11].strip() + "</td></tr></table><br>"
+        mailList.append(error[4])
+
+    return [content, mailList]
 
 errorInfo = getErrorInfo(sys.argv[1])
 #buildInfo = getBuildInfo(sys.argv[2])
-#sendMail("mail.cfg", mailInfo)
+sendMail("mail.cfg", errorInfo)
